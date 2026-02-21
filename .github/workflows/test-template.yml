@@ -901,16 +901,8 @@ jobs:
           skip-tsc: true
 
       - run: pnpm run test
-        name: 'adapter-libsql'
-        working-directory: packages/adapter-libsql
-
-      - run: pnpm run test
         name: 'adapter-mariadb'
         working-directory: packages/adapter-mariadb
-
-      - run: pnpm run test
-        name: 'adapter-d1'
-        working-directory: packages/adapter-d1
 
       - run: pnpm run test
         name: 'adapter-pg'
@@ -1274,5 +1266,41 @@ jobs:
           account: 17219288
           repository: 192925833
           path: packages/*/junit*.xml
+          key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+  #
+  # Driver Adapter Unit Tests
+  #
+  vitest:
+    name: Vitest ${{ matrix.os }} [v${{ matrix.node }}]
+    timeout-minutes: 10
+    runs-on: ${{ matrix.os }}
+    if: contains(inputs.jobsToRun, '-all-')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ['20.19.0', '22', '24']
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install & build
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ matrix.node }}
+          engine-hash: ${{ inputs.engineHash }}
+          skip-tsc: true
+
+      - run: pnpm vitest
+
+      - name: Upload test results to BuildPulse for flaky test detection
+        # Only run this step for branches where we have access to secrets.
+        # Run this step even when the tests fail. Skip if the workflow is cancelled.
+        if: env.HAS_BUILDPULSE_SECRETS == 'true' && !cancelled() && inputs.reason == 'buildpulse' && github.repository == 'prisma/prisma'
+        uses: buildpulse/buildpulse-action@v0.11.0
+        with:
+          account: 17219288
+          repository: 192925833
+          path: junit.xml
           key: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
           secret: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
